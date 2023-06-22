@@ -22,21 +22,20 @@ func NewWorkerPool(numWorkers, queueSize int) *WorkersPool {
 }
 
 func (wp *WorkersPool) AddJob(task Job) {
+	wp.wg.Add(1)
 	wp.jobQueue <- task
 }
 
 func (wp *WorkersPool) Start() {
-	// Start the worker goroutines
 	for i := 1; i <= wp.numWorkers; i++ {
-		wp.wg.Add(1)
 		go wp.worker(i)
 	}
 
-	go func() {
-		wp.wg.Wait()
-	}()
-
 	fmt.Println("Worker pool started")
+}
+
+func (wp *WorkersPool) Wait() {
+	wp.wg.Wait()
 }
 
 func (wp *WorkersPool) Stop() {
@@ -46,7 +45,6 @@ func (wp *WorkersPool) Stop() {
 }
 
 func (wp *WorkersPool) worker(id int) {
-	defer wp.wg.Done()
 	for {
 		select {
 		case task, ok := <-wp.jobQueue:
@@ -59,6 +57,7 @@ func (wp *WorkersPool) worker(id int) {
 				fmt.Printf("Worker %d, ERROR processing task: %d\n", id, task.ID())
 			}
 			fmt.Printf("Worker %d processing task: %d\n", id, task.ID())
+			wp.wg.Done()
 		case <-wp.quitCh:
 			fmt.Printf("Worker %d stopped\n", id)
 			wp.Stop()

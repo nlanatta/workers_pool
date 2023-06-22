@@ -1,16 +1,21 @@
 package main
 
 import (
+	"sync"
 	"testing"
 )
 
+var counter = 0
+
 type TestJob struct {
-	Id     int
-	Result chan int
+	Id  int
+	mut sync.Mutex
 }
 
 func (j *TestJob) Process() error {
-	j.Result <- 1
+	j.mut.Lock()
+	defer j.mut.Unlock()
+	counter++
 	return nil
 }
 
@@ -24,20 +29,13 @@ func TestNewWorkerPool(t *testing.T) {
 
 	wp.Start()
 
-	c := make(chan int, expected)
-
 	for i := 1; i <= expected; i++ {
-		task := &TestJob{Id: i, Result: c}
+		task := &TestJob{Id: i}
 		wp.AddJob(task)
 	}
 
-	result := 0
-	for v := range c {
-		result += v
-		if result == expected {
-			close(c)
-		}
-	}
+	wp.Wait()
+	result := counter
 
 	if result != expected {
 		t.Fatalf("expected 10, got %d", result)
